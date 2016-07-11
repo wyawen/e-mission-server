@@ -72,6 +72,46 @@ app = app()
 # the python path so that we can keep our separation between the main code and
 # the webapp layer
 
+
+#Pulling public data from the server  
+import emission.storage.timeseries.timequery as estt
+import emission.core.get_database as edb
+from uuid import UUID
+import datetime as pydt
+
+@get('/getData')
+def getData():
+  from_date = request.query.from_date
+  to_date = request.query.to_date
+
+  from_dt = pydt.datetime.strptime(from_date, "%Y-%m-%d")
+  to_dt = pydt.datetime.strptime(to_date, "%Y-%m-%d")
+  
+  from_ts = int(from_dt.strftime("%s"))
+  to_ts = int(to_dt.strftime("%s"))
+  time_range = estt.TimeQuery("metadata.write_ts", from_ts, to_ts)
+  time_query = time_range.get_query()
+
+  iphone_ids = [UUID("079e0f1a-c440-3d7c-b0e7-de160f748e35"), UUID("c76a0487-7e5a-3b17-a449-47be666b36f6"), 
+              UUID("c528bcd2-a88b-3e82-be62-ef4f2396967a"), UUID("95e70727-a04e-3e33-b7fe-34ab19194f8b")]
+  android_ids = [UUID("e471711e-bd14-3dbe-80b6-9c7d92ecc296"), UUID("fd7b4c2e-2c8b-3bfa-94f0-d1e3ecbd5fb7"),
+               UUID("86842c35-da28-32ed-a90e-2da6663c5c73"), UUID("3bc0f91f-7660-34a2-b005-5c399598a369")]
+  
+  iphone_user_queries = map(lambda id: {'user_id': id}, iphone_ids)
+  android_user_queries = map(lambda id: {'user_id': id}, android_ids)
+
+  for q in iphone_user_queries:
+    q.update(time_query)
+
+  for q in android_user_queries:
+    q.update(time_query)
+
+  iphone_list = map(lambda q: list(edb.get_timeseries_db().find(q).sort("metadata.write_ts")), iphone_user_queries)
+  android_list = map(lambda q: list(edb.get_timeseries_db().find(q).sort("metadata.write_ts")), android_user_queries)
+
+  return {'iphone_data': iphone_list, 'android_data': android_list}
+
+
 #Simple path that serves up a static landing page with javascript in it
 @route('/')
 def index():
